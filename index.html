@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nigerian Payroll Calculator</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      padding: 20px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 8px;
+      text-align: center;
+    }
+    th {
+      background-color: #f4f4f4;
+    }
+    input[type="number"], input[type="text"] {
+      width: 90%;
+      padding: 5px;
+    }
+    .btn {
+      padding: 8px 12px;
+      margin: 5px;
+      cursor: pointer;
+      border: none;
+      color: white;
+    }
+    .btn-add { background-color: green; }
+    .btn-edit { background-color: orange; }
+    .btn-delete { background-color: red; }
+  </style>
+</head>
+<body>
+
+  <h1>Nigerian Payroll Calculator</h1>
+
+  <!-- Payroll Rates -->
+  <h3>Adjust Payroll Rates</h3>
+  <label>Pension Rate (%): <input type="number" id="pensionRate" value="8"></label>
+  <label>NHF Rate (%): <input type="number" id="nhfRate" value="2.5"></label>
+  <label>NHIS Rate (%): <input type="number" id="nhisRate" value="5"></label>
+  <br><br>
+
+  <!-- Add Employee Section -->
+  <h3>Add New Employee</h3>
+  <form id="employeeForm">
+    <input type="text" id="name" placeholder="Employee Name" required>
+    <input type="number" id="basic" placeholder="Annual Basic Salary" required>
+    <input type="number" id="housing" placeholder="Annual Housing Allowance" required>
+    <input type="number" id="transport" placeholder="Annual Transport Allowance" required>
+    <input type="number" id="deductions" placeholder="Other Deductions" required>
+    <button type="submit" class="btn btn-add">Add Employee</button>
+  </form>
+
+  <!-- Payroll Schedule -->
+  <h3>Payroll Schedule</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Gross Income</th>
+        <th>CRA</th>
+        <th>Pension</th>
+        <th>PAYE Tax</th>
+        <th>NHF</th>
+        <th>NHIS</th>
+        <th>Other Deductions</th>
+        <th>Net Salary</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody id="payrollTable">
+      <!-- Employee rows will be dynamically added here -->
+    </tbody>
+  </table>
+
+  <script>
+    const payrollTable = document.getElementById("payrollTable");
+    const employeeForm = document.getElementById("employeeForm");
+
+    // Payroll rates
+    const rates = {
+      pension: document.getElementById("pensionRate"),
+      nhf: document.getElementById("nhfRate"),
+      nhis: document.getElementById("nhisRate"),
+    };
+
+    // Add Employee to Payroll
+    employeeForm.addEventListener("submit", (e) => {
+  e.preventDefault();
+
+  const name = document.getElementById("name").value;
+  const basic = parseFloat(document.getElementById("basic").value);
+  const housing = parseFloat(document.getElementById("housing").value);
+  const transport = parseFloat(document.getElementById("transport").value);
+  const deductions = parseFloat(document.getElementById("deductions").value);
+
+  const editingRow = Array.from(payrollTable.rows).find(row => row.getAttribute("data-editing") === "true");
+
+  if (editingRow) {
+    // Update existing row
+    editingRow.cells[0].textContent = name;
+    editingRow.cells[1].textContent = (basic + housing + transport).toFixed(2); // Update Gross Income
+    editingRow.querySelector(".basic").textContent = basic; // Update Hidden Basic
+    editingRow.querySelector(".housing").textContent = housing; // Update Hidden Housing
+    editingRow.querySelector(".transport").textContent = transport; // Update Hidden Transport
+    editingRow.removeAttribute("data-editing");
+  } else {
+    // Add new employee
+    addEmployee(name, basic, housing, transport, deductions);
+  }
+
+  employeeForm.reset();
+});
+
+
+function addEmployee(name, basic, housing, transport, deductions) {
+  const row = document.createElement("tr");
+
+  const grossIncome = basic + housing + transport;
+  const pension = calculatePercentage(grossIncome, rates.pension.value);
+  const payeTax = calculatePAYE(grossIncome);
+  const nhf = calculatePercentage(grossIncome, rates.nhf.value);
+  const nhis = calculatePercentage(grossIncome, rates.nhis.value);
+  const netSalary = grossIncome - (pension + payeTax + nhf + nhis + deductions);
+
+  row.innerHTML = `
+    <td>${name}</td>
+    <td>${grossIncome.toFixed(2)}</td>
+    <td>${calculateCRA(grossIncome).toFixed(2)}</td>
+    <td>${payeTax.toFixed(2)}</td>
+    <td>${pension.toFixed(2)}</td>
+    <td>${nhf.toFixed(2)}</td>
+    <td>${nhis.toFixed(2)}</td>
+    <td>${deductions.toFixed(2)}</td>
+    <td>${netSalary.toFixed(2)}</td>
+    <td style="display: none;" class="basic">${basic}</td> <!-- Hidden Basic -->
+    <td style="display: none;" class="housing">${housing}</td> <!-- Hidden Housing -->
+    <td style="display: none;" class="transport">${transport}</td> <!-- Hidden Transport -->
+    <td>
+      <button class="btn btn-edit" onclick="editEmployee(this)">Edit</button>
+      <button class="btn btn-delete" onclick="deleteEmployee(this)">Delete</button>
+    </td>
+  `;
+  payrollTable.appendChild(row);
+}
+
+    function calculateCRA(grossIncome) {
+  const calculatedCRA = 0.01 * grossIncome + 0.2 * grossIncome; // 1% + 20% of gross income
+  const cra = Math.max(200000, calculatedCRA); // Higher of ₦200,000 or calculated CRA
+  return cra;
+}
+
+    function calculatePAYE(taxableIncome) {
+      if (taxableIncome <= 300000) return (7 / 100) * taxableIncome;
+      if (taxableIncome <= 600000) return (11 / 100) * taxableIncome;
+      if (taxableIncome <= 1100000) return (15 / 100) * taxableIncome;
+      if (taxableIncome <= 1600000) return (19 / 100) * taxableIncome;
+      if (taxableIncome <= 3200000) return (21 / 100) * taxableIncome;
+      return (24 / 100) * taxableIncome;
+    }
+
+    function calculatePercentage(amount, rate) {
+      return (amount * rate) / 100;
+    }
+
+    function editEmployee(button) {
+  const row = button.parentElement.parentElement;
+
+  // Retrieve values from hidden columns
+  const basic = parseFloat(row.querySelector(".basic").textContent);
+  const housing = parseFloat(row.querySelector(".housing").textContent);
+  const transport = parseFloat(row.querySelector(".transport").textContent);
+
+  // Populate the form fields
+  document.getElementById("name").value = row.cells[0].textContent;
+  document.getElementById("basic").value = basic;
+  document.getElementById("housing").value = housing;
+  document.getElementById("transport").value = transport;
+  document.getElementById("deductions").value = parseFloat(row.cells[7].textContent);
+
+  // Mark the row for editing
+  row.setAttribute("data-editing", "true");
+}
+
+
+    function deleteEmployee(button) {
+      const row = button.parentElement.parentElement;
+      payrollTable.removeChild(row);
+    }
+  </script>
+
+</body>
+</html>
